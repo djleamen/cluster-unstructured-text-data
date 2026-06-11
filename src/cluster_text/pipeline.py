@@ -62,6 +62,8 @@ def run_pipeline(
 
     if cfg.algorithm == "kmeans":
         k = cfg.n_clusters or suggest_kmeans_k(X, *cfg.auto_k_range)
+        # K-Means cannot form more clusters than there are samples.
+        k = max(1, min(k, X.shape[0]))
         clustering = run_kmeans(X, n_clusters=k)
     elif cfg.algorithm == "dbscan":
         clustering = run_dbscan(
