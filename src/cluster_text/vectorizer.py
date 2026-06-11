@@ -49,8 +49,8 @@ def vectorize(
         )
         try:
             X = vec.fit_transform(texts)
-        except ValueError:
-            if min_df == 1:
+        except ValueError as exc:
+            if min_df == 1 or "no terms remain" not in str(exc):
                 raise
             # min_df pruned every term (no term repeats); retry keeping all.
             vec = TfidfVectorizer(

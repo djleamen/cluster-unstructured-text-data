@@ -61,9 +61,12 @@ def run_pipeline(
     X: np.ndarray = vec.matrix
 
     if cfg.algorithm == "kmeans":
-        k = cfg.n_clusters or suggest_kmeans_k(X, *cfg.auto_k_range)
+        if cfg.n_clusters is not None and cfg.n_clusters < 1:
+            raise ValueError("n_clusters must be >= 1")
+        k = cfg.n_clusters if cfg.n_clusters is not None else suggest_kmeans_k(
+            X, *cfg.auto_k_range)
         # K-Means cannot form more clusters than there are samples.
-        k = max(1, min(k, X.shape[0]))
+        k = min(k, X.shape[0])
         clustering = run_kmeans(X, n_clusters=k)
     elif cfg.algorithm == "dbscan":
         clustering = run_dbscan(
