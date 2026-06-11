@@ -96,7 +96,11 @@ def _print_human(result) -> None:
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for the command-line interface."""
     args = _build_parser().parse_args(argv)
-    docs = load_text_files(args.paths, split_mode=args.split)
+    try:
+        docs = load_text_files(args.paths, split_mode=args.split)
+    except FileNotFoundError as exc:
+        print(f"Input path not found: {exc}", file=sys.stderr)
+        return 2
     if not docs:
         print("No text records found.", file=sys.stderr)
         return 2

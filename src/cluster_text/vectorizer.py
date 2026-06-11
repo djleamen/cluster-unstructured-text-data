@@ -35,6 +35,11 @@ def vectorize(
     if kind == "tfidf":
         from sklearn.feature_extraction.text import TfidfVectorizer
 
+        # Clamp min_df for tiny corpora so sklearn does not reject the input
+        # (e.g. min_df=2 with a single document).
+        if isinstance(min_df, int):
+            min_df = max(1, min(min_df, len(texts)))
+
         vec = TfidfVectorizer(
             max_features=max_features,
             ngram_range=ngram_range,
@@ -42,7 +47,20 @@ def vectorize(
             stop_words="english",
             lowercase=True,
         )
-        X = vec.fit_transform(texts)
+        try:
+            X = vec.fit_transform(texts)
+        except ValueError as exc:
+            if min_df == 1 or "no terms remain" not in str(exc):
+                raise
+            # min_df pruned every term (no term repeats); retry keeping all.
+            vec = TfidfVectorizer(
+                max_features=max_features,
+                ngram_range=ngram_range,
+                min_df=1,
+                stop_words="english",
+                lowercase=True,
+            )
+            X = vec.fit_transform(texts)
         return VectorizationResult(
             matrix=X.toarray(),
             kind="tfidf",

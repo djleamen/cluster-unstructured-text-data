@@ -156,15 +156,16 @@ if result:
                 st.markdown("**Representative examples:**")
                 for ex in s.exemplars:
                     st.markdown(f"> {ex}")
-            with st.expander("All member documents", expanded=False):
-                members = pd.DataFrame(
-                    [
-                        {"id": d.id, "text": d.text}
-                        for d, lbl in zip(result.documents, result.clustering.labels)
-                        if int(lbl) == s.cluster_id
-                    ]
-                )
-                st.dataframe(members, use_container_width=True, height=240)
+            # Note: expanders cannot be nested, so list members directly.
+            st.markdown("**All member documents:**")
+            members = pd.DataFrame(
+                [
+                    {"id": d.id, "text": d.text}
+                    for d, lbl in zip(result.documents, result.clustering.labels)
+                    if int(lbl) == s.cluster_id
+                ]
+            )
+            st.dataframe(members, use_container_width=True, height=240)
 
     # ----- Download ---------------------------------------------------------
     st.subheader("⬇️ Export")
