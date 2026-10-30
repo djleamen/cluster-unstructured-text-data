@@ -73,3 +73,15 @@ def test_auto_k_selection():
     )
     result = run_pipeline(docs, cfg)
     assert 2 <= result.clustering.n_clusters <= 5
+
+
+def test_auto_k_on_large_input_uses_sampled_silhouette():
+    """Above the sample threshold auto-K still finds well-separated blobs."""
+    import numpy as np
+    from cluster_text.clustering import SILHOUETTE_SAMPLE_SIZE, suggest_kmeans_k
+
+    rng = np.random.default_rng(0)
+    centers = np.array([[0, 0], [10, 10], [0, 10]])
+    X = np.vstack([c + rng.normal(scale=0.5, size=(2000, 2)) for c in centers])
+    assert X.shape[0] > SILHOUETTE_SAMPLE_SIZE
+    assert suggest_kmeans_k(X, 2, 6) == 3
