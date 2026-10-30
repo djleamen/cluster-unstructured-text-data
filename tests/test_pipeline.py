@@ -98,20 +98,17 @@ def test_sampled_silhouette_keeps_tiny_clusters():
     assert _silhouette(X, labels) > 0
 
 
-def test_sampled_silhouette_stays_bounded_with_many_clusters():
-    """Many tiny clusters must not blow the sample past the fixed budget."""
+def test_sampled_silhouette_stays_bounded():
+    """The sample passed to silhouette_score never exceeds the fixed budget."""
     import numpy as np
     import sklearn.metrics
-    from cluster_text import clustering
-    from cluster_text.clustering import (
-        SILHOUETTE_SAMPLE_SIZE,
-        _silhouette,
-        _silhouette_safe,
-    )
+    from cluster_text.clustering import SILHOUETTE_SAMPLE_SIZE, _silhouette
 
     rng = np.random.default_rng(0)
-    X = rng.normal(size=(100000, 2))
-    labels = np.repeat(np.arange(20000), 5)  # 20k clusters, far above the budget
+    # n above the budget, few clusters: sampling actually happens.
+    X = np.vstack([c + rng.normal(scale=0.5, size=(4000, 2))
+                   for c in np.array([[0, 0], [10, 10], [0, 10]])])
+    labels = np.repeat(np.arange(3), 4000)
 
     sizes = []
     real = sklearn.metrics.silhouette_score
@@ -120,7 +117,35 @@ def test_sampled_silhouette_stays_bounded_with_many_clusters():
         _silhouette(X, labels)
     finally:
         sklearn.metrics.silhouette_score = real
-    assert sizes[-1] <= SILHOUETTE_SAMPLE_SIZE
+    assert sizes and sizes[-1] <= SILHOUETTE_SAMPLE_SIZE
+
+
+def test_sampled_silhouette_unavailable_when_budget_cannot_fit_clusters():
+    """When clusters can't each keep >=2 sampled members, report unavailable,
+    not a misleadingly low score from singleton-reduced clusters."""
+    import numpy as np
+    from cluster_text.clustering import _silhouette_safe
+
+    rng = np.random.default_rng(0)
+    # 4,999 well-separated clusters of two coincident points each: the exact
+    # silhouette is 1.0, but it cannot be sampled within the budget. The old
+    # one-rep-per-cluster fill made 4,998 of them singletons and returned ~0.
+    centers = rng.normal(scale=100, size=(4999, 2))
+    X = np.repeat(centers, 2, axis=0)
+    labels = np.repeat(np.arange(4999), 2)
+    assert _silhouette_safe(X, labels) is None
+
+
+def test_sampled_silhouette_many_tiny_clusters_is_bounded_or_unavailable():
+    """A huge number of tiny clusters never blows the sample past the budget."""
+    import numpy as np
+    from cluster_text.clustering import _silhouette_safe
+
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(100000, 2))
+    labels = np.repeat(np.arange(20000), 5)  # 20k clusters, far above the budget
+    # Can't keep two members of every cluster within 5,000, so: unavailable.
+    assert _silhouette_safe(X, labels) is None
 
     # When clusters outnumber the budget the estimate is undefined, not a crash.
     assert _silhouette_safe(X, labels) is None
