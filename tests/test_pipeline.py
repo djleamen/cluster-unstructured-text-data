@@ -96,3 +96,31 @@ def test_sampled_silhouette_keeps_tiny_clusters():
     X = np.vstack([rng.normal(size=(20000, 2)), rng.normal(loc=50, size=(5, 2))])
     labels = np.array([0] * 20000 + [1] * 5)
     assert _silhouette(X, labels) > 0
+
+
+def test_sampled_silhouette_stays_bounded_with_many_clusters():
+    """Many tiny clusters must not blow the sample past the fixed budget."""
+    import numpy as np
+    import sklearn.metrics
+    from cluster_text import clustering
+    from cluster_text.clustering import (
+        SILHOUETTE_SAMPLE_SIZE,
+        _silhouette,
+        _silhouette_safe,
+    )
+
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(100000, 2))
+    labels = np.repeat(np.arange(20000), 5)  # 20k clusters, far above the budget
+
+    sizes = []
+    real = sklearn.metrics.silhouette_score
+    sklearn.metrics.silhouette_score = lambda Xs, ls, *a, **k: sizes.append(Xs.shape[0]) or 0.0
+    try:
+        _silhouette(X, labels)
+    finally:
+        sklearn.metrics.silhouette_score = real
+    assert sizes[-1] <= SILHOUETTE_SAMPLE_SIZE
+
+    # When clusters outnumber the budget the estimate is undefined, not a crash.
+    assert _silhouette_safe(X, labels) is None

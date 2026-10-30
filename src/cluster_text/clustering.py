@@ -20,14 +20,24 @@ def _silhouette(X: np.ndarray, labels: np.ndarray, random_state: int = 42) -> fl
     n = X.shape[0]
     if n <= SILHOUETTE_SAMPLE_SIZE:
         return float(silhouette_score(X, labels))
-    # Uniform sample, plus one point from any cluster it missed: a tiny
-    # cluster absent from the sample would otherwise make the score undefined
-    # (or skew auto-K) even though the full clustering is valid.
+    # Estimate on a sample capped at SILHOUETTE_SAMPLE_SIZE so the work stays
+    # bounded regardless of cluster count. Every cluster must be represented:
+    # a tiny cluster absent from a purely uniform sample would otherwise make
+    # the score undefined (or skew auto-K) even though the clustering is valid.
+    # One stable argsort groups the points by label in a single pass, avoiding
+    # a per-cluster scan over all n labels.
     rng = np.random.default_rng(random_state)
-    idx = rng.choice(n, size=SILHOUETTE_SAMPLE_SIZE, replace=False)
-    missing = np.setdiff1d(np.unique(labels), labels[idx])
-    extra = [rng.choice(np.flatnonzero(labels == label)) for label in missing]
-    idx = np.concatenate([idx, np.asarray(extra, dtype=idx.dtype)])
+    order = np.argsort(labels, kind="stable")
+    group_starts = np.concatenate(([0], np.flatnonzero(np.diff(labels[order])) + 1))
+    reps = order[group_starts]  # first point of each cluster
+    if reps.size >= SILHOUETTE_SAMPLE_SIZE:
+        # More clusters than the budget: keep a bounded representative subset.
+        idx = rng.choice(reps, size=SILHOUETTE_SAMPLE_SIZE, replace=False)
+    else:
+        # One point per cluster, then fill the budget uniformly from the rest.
+        pool = np.setdiff1d(np.arange(n), reps, assume_unique=True)
+        fill = rng.choice(pool, size=SILHOUETTE_SAMPLE_SIZE - reps.size, replace=False)
+        idx = np.concatenate([reps, fill])
     return float(silhouette_score(X[idx], labels[idx]))
 
 
