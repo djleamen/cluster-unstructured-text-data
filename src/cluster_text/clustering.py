@@ -17,8 +17,18 @@ SILHOUETTE_SAMPLE_SIZE = 5000
 def _silhouette(X: np.ndarray, labels: np.ndarray, random_state: int = 42) -> float:
     from sklearn.metrics import silhouette_score
 
-    sample_size = SILHOUETTE_SAMPLE_SIZE if X.shape[0] > SILHOUETTE_SAMPLE_SIZE else None
-    return float(silhouette_score(X, labels, sample_size=sample_size, random_state=random_state))
+    n = X.shape[0]
+    if n <= SILHOUETTE_SAMPLE_SIZE:
+        return float(silhouette_score(X, labels))
+    # Uniform sample, plus one point from any cluster it missed: a tiny
+    # cluster absent from the sample would otherwise make the score undefined
+    # (or skew auto-K) even though the full clustering is valid.
+    rng = np.random.default_rng(random_state)
+    idx = rng.choice(n, size=SILHOUETTE_SAMPLE_SIZE, replace=False)
+    missing = np.setdiff1d(np.unique(labels), labels[idx])
+    extra = [rng.choice(np.flatnonzero(labels == label)) for label in missing]
+    idx = np.concatenate([idx, np.asarray(extra, dtype=idx.dtype)])
+    return float(silhouette_score(X[idx], labels[idx]))
 
 
 @dataclass

@@ -85,3 +85,14 @@ def test_auto_k_on_large_input_uses_sampled_silhouette():
     X = np.vstack([c + rng.normal(scale=0.5, size=(2000, 2)) for c in centers])
     assert X.shape[0] > SILHOUETTE_SAMPLE_SIZE
     assert suggest_kmeans_k(X, 2, 6) == 3
+
+
+def test_sampled_silhouette_keeps_tiny_clusters():
+    """A 5-point cluster among 20k points must not vanish from the sample."""
+    import numpy as np
+    from cluster_text.clustering import _silhouette
+
+    rng = np.random.default_rng(1)
+    X = np.vstack([rng.normal(size=(20000, 2)), rng.normal(loc=50, size=(5, 2))])
+    labels = np.array([0] * 20000 + [1] * 5)
+    assert _silhouette(X, labels) > 0
